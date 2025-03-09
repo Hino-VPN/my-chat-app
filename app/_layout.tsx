@@ -15,7 +15,7 @@ import i18n from '../i18n';
 import { UserProvider, useUser } from '@/contexts/UserContext';
 import { ChatProvider, useChat } from '@/contexts/ChatContext';
 import { auth } from '@/firebase';
-import { getProfile } from '@/services/firebase/profileService';
+import { getProfile, subscribeToProfileUpdates } from '@/services/firebase/profileService';
 import { getUserChats } from '@/services/firebase/chatService';
 import { AlertProvider } from '../contexts/AlertProvider';
 import { syncUserData, cleanupSubscriptions } from '@/services/firebase/syncService';
@@ -55,7 +55,7 @@ const AuthStateHandler = () => {
             }
             
             // 設置全局訂閱 - 這將訂閱所有聊天和消息，直到用戶登出
-            await syncUserData(user.uid);
+            await syncUserData(user.uid, setUser);
             
             // 導航到聊天列表
             router.replace('/chatList');
