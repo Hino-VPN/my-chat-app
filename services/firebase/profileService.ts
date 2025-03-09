@@ -1,5 +1,5 @@
 // services/firebase/profileService.ts
-import { collection, query, where, getDocs, doc, setDoc, updateDoc, addDoc, getDoc, deleteDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, setDoc, updateDoc, addDoc, getDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
 import { Profile } from '../../models/Profile';
 import { Timestamp } from 'firebase/firestore';
 import { db } from '@/firebase';
@@ -102,6 +102,24 @@ export const createAppUserProfile = async (email: string, password: string, prof
 
 
 /**
+ * 更新個人資料頭像
+ * @param userId 用戶ID
+ * @param avatarUrl 頭像URL
+ */
+export const updateProfileAvatar = async (userId: string, avatarUrl: string) => {
+  try {
+    const profileRef = doc(db, 'profiles', userId);
+    await updateDoc(profileRef, { 
+      avatar: avatarUrl,
+      lastUpdatedAt: Timestamp.now()
+    });
+    return true;
+  } catch (error) {
+    throw error;
+  }
+};
+
+/**
  * 更新現有 Profile
  * @param profile Profile 資料（必須包含 id）
  */
@@ -114,7 +132,10 @@ export const updateProfile = async (userId: string, profileData: {
   try {
     // 實現更新個人資料邏輯...
     const profileRef = doc(db, 'profiles', userId);
-    await updateDoc(profileRef, profileData);
+    await updateDoc(profileRef, {
+      ...profileData,
+      lastUpdatedAt: Timestamp.now()
+    });
     return true;
   } catch (error) {
     throw error;
@@ -159,3 +180,25 @@ export const deleteProfile = async (userId: string) => {
   }
 }
 
+/**
+ * 訂閱用戶個人資料更新
+ * @param userId 用戶ID
+ * @param callback 當個人資料更新時調用的回調函數
+ * @returns 取消訂閱的函數
+ */
+export const subscribeToProfileUpdates = (userId: string, callback: (profile: Profile) => void) => {
+  const profileRef = doc(db, 'profiles', userId);
+  
+  // 使用 onSnapshot 監聽文檔變化
+  const unsubscribe = onSnapshot(profileRef, (doc) => {
+    if (doc.exists()) {
+      const profileData = doc.data() as Profile;
+      callback(profileData);
+    }
+  }, (error) => {
+    console.error('Error subscribing to profile updates:', error);
+  });
+  
+  // 返回取消訂閱的函數
+  return unsubscribe;
+};

@@ -1,4 +1,4 @@
-import React, { useState, useContext, useEffect } from 'react';
+import React, { useContext } from 'react';
 import {
   View,
   Text,
@@ -7,22 +7,15 @@ import {
   ScrollView,
   Switch,
   Image,
-  Alert,
   SafeAreaView,
-  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { ThemeContext } from '@/contexts/ThemeContext';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { signOut } from 'firebase/auth';
-import { auth } from '@/firebase';
-import { getCurrentUser } from '@/services/firebase/userService';
 import { StatusBar } from 'expo-status-bar';
 import LoadingOverlay from '@/components/LoadingOverlay';
-import { Profile } from '@/models/Profile';
-import { getProfile } from '@/services/firebase/profileService';
 import { logoutUser } from '@/services/firebase/authService';
 import { useAuth } from '@/contexts/AuthContext';
 import { useChat } from '@/contexts/ChatContext';
@@ -33,34 +26,12 @@ export default function SettingsPage() {
   const router = useRouter();
   const { t, i18n } = useTranslation();
   const { theme, isDark, toggleTheme } = useContext(ThemeContext);
-  
-  const [loading, setLoading] = useState(false);
-  const [userProfile, setUserProfile] = useState<Profile | null>(null);
-  
+  const { user } = useUser();
   const { resetAuth } = useAuth();
   const { resetChat } = useChat();
   const { resetUser } = useUser();
   const { showAlert } = useAlert();
   
-  // 載入用戶資料
-  useEffect(() => {
-    loadUserProfile();
-  }, []);
-  
-  const loadUserProfile = async () => {
-    setLoading(true);
-    const currentUser = getCurrentUser();
-    if (currentUser) {
-      try {
-        const profile = await getProfile(currentUser.uid);
-        setUserProfile(profile);
-      } catch (error) {
-        console.error('Error loading user profile:', error);
-      }
-    }
-    setLoading(false);
-  };
-
   // 切換語言
   const toggleLanguage = () => {
     const newLang = i18n.language === 'en' ? 'zh-HK' : 'en';
@@ -70,7 +41,7 @@ export default function SettingsPage() {
   };
   
   // 登出
-  const handleLogout = async () => {
+  const handleLogout = () => {
     showAlert(
       t('settings.logoutConfirmTitle'),
       t('settings.logoutConfirmMessage'),
@@ -84,7 +55,6 @@ export default function SettingsPage() {
           style: 'destructive',
           onPress: async () => {
             try {
-              setLoading(true);
               await logoutUser();
               await resetAuth();
               await resetUser();
@@ -94,8 +64,6 @@ export default function SettingsPage() {
             } catch (error) {
               console.error('Logout error:', error);
               showAlert(t('errors.error'), t('settings.logoutError'));
-            } finally {
-              setLoading(false);
             }
           },
         },
@@ -107,10 +75,6 @@ export default function SettingsPage() {
   const navigateToProfileEdit = () => {
     router.push('/profileEdit');
   };
-
-  if (loading) {
-    return <LoadingOverlay visible={loading} />;
-  }
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
@@ -131,21 +95,21 @@ export default function SettingsPage() {
           onPress={navigateToProfileEdit}
         >
           <View style={styles.profileHeader}>
-            {userProfile?.avatar ? (
-              <Image source={{ uri: userProfile.avatar }} style={styles.avatar} />
+            {user?.avatar ? (
+              <Image source={{ uri: user.avatar }} style={styles.avatar} />
             ) : (
               <View style={[styles.defaultAvatar, { backgroundColor: theme.primary }]}>
                 <Text style={styles.avatarText}>
-                  {userProfile?.username ? userProfile.username.charAt(0).toUpperCase() : '?'}
+                  {user?.username ? user.username.charAt(0).toUpperCase() : '?'}
                 </Text>
               </View>
             )}
             <View style={styles.profileInfo}>
               <Text style={[styles.profileName, { color: theme.text }]}>
-                {userProfile?.username || t('settings.unknownUser')}
+                {user?.username || t('settings.unknownUser')}
               </Text>
               <Text style={[styles.profileEmail, { color: theme.secondaryText }]}>
-                {userProfile?.email || ''}
+                {user?.email || ''}
               </Text>
             </View>
             <Ionicons name="chevron-forward" size={24} color={theme.secondaryText} />
@@ -208,7 +172,7 @@ export default function SettingsPage() {
           </Text>
           
           {/* 登出選項 */}
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[styles.settingsItem, { backgroundColor: theme.cardBackground }]}
             onPress={handleLogout}
           >
@@ -243,70 +207,58 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 16,
-    paddingBottom: 30,
+    padding: 16,
   },
   pageTitle: {
-    fontSize: 30,
+    fontSize: 24,
     fontWeight: 'bold',
-    marginTop: 20,
     marginBottom: 24,
   },
   profileCard: {
-    borderRadius: 16,
+    borderRadius: 12,
     padding: 16,
     marginBottom: 24,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
   },
   profileHeader: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   avatar: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    marginRight: 16,
   },
   defaultAvatar: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    marginRight: 16,
     justifyContent: 'center',
     alignItems: 'center',
   },
   avatarText: {
-    color: 'white',
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: 'bold',
+    color: '#FFFFFF',
   },
   profileInfo: {
     flex: 1,
-    marginLeft: 16,
   },
   profileName: {
     fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 4,
+    fontWeight: '500',
   },
   profileEmail: {
     fontSize: 14,
+    marginTop: 4,
   },
   settingsGroup: {
     marginBottom: 24,
   },
   settingsGroupTitle: {
     fontSize: 14,
-    fontWeight: '500',
     marginBottom: 8,
-    marginLeft: 8,
-    textTransform: 'uppercase',
   },
   settingsItem: {
     flexDirection: 'row',
@@ -341,4 +293,4 @@ const styles = StyleSheet.create({
   versionText: {
     fontSize: 14,
   },
-}); 
+});

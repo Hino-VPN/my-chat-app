@@ -1,14 +1,31 @@
 import { getUserChats, subscribeToUserChats } from './chatService';
 import { subscribeToChatMessages } from './messageService';
+import { subscribeToProfileUpdates } from './profileService';
+import { useUser } from '@/contexts/UserContext';
 
 // 用於存儲訂閱，以便可以在需要時取消
 let chatSubscription: (() => void) | null = null;
+let profileSubscription: (() => void) | null = null;
 const messageSubscriptions: Record<string, () => void> = {};
 
 // 同步用戶的聊天和訊息數據
-export const syncUserData = async (userId: string) => {
+export const syncUserData = async (userId: string, setUser?: (profile: any) => void) => {
   try {
     console.log('syncUserData called for user:', userId, 'timestamp:', new Date().toISOString());
+    
+    // 訂閱用戶個人資料更新
+    if (profileSubscription) {
+      console.log('已存在個人資料訂閱，不再重複訂閱');
+    } else {
+      console.log('創建新的個人資料訂閱');
+      profileSubscription = subscribeToProfileUpdates(userId, (profile) => {
+        console.log('個人資料已更新:', profile.username);
+        // 如果提供了 setUser 函數，則更新用戶狀態
+        if (setUser) {
+          setUser(profile);
+        }
+      });
+    }
     
     // 取得用戶所有聊天室
     const chats = await getUserChats(userId);
@@ -83,6 +100,11 @@ export const cleanupSubscriptions = () => {
     chatSubscription = null;
   }
   
+  if (profileSubscription) {
+    profileSubscription();
+    profileSubscription = null;
+  }
+  
   Object.values(messageSubscriptions).forEach(unsubscribe => {
     unsubscribe();
   });
@@ -91,4 +113,4 @@ export const cleanupSubscriptions = () => {
   Object.keys(messageSubscriptions).forEach(key => {
     delete messageSubscriptions[key];
   });
-}; 
+};
